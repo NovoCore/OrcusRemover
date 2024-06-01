@@ -41,7 +41,6 @@ public class FileManager
             Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             Path.GetTempPath()
-
         };
 
         int totalFiles = directories.Sum(dir => CountFiles(dir));
@@ -55,11 +54,13 @@ public class FileManager
         {
             try
             {
-                var files = Directory.EnumerateFiles(folder, "*.*", SearchOption.AllDirectories);
+                Console.WriteLine($"Scanning folder: {folder}");
+                var files = GetFiles(folder, "*.*");
                 foreach (string file in files)
                 {
                     try
                     {
+                        Console.WriteLine($"Processing file: {file}");
                         if (IsNanoCoreAssembly(file))
                         {
                             listView1.Invoke(new Action(() =>
@@ -120,21 +121,29 @@ public class FileManager
     private List<string> GetFiles(string path, string pattern)
     {
         var files = new List<string>();
-        var directories = new string[] { };
+        var stack = new Stack<string>();
+        stack.Push(path);
 
-        try
+        while (stack.Count > 0)
         {
-            files.AddRange(Directory.GetFiles(path, pattern, SearchOption.TopDirectoryOnly));
-            directories = Directory.GetDirectories(path);
-        }
-        catch (UnauthorizedAccessException) { }
-
-        foreach (var directory in directories)
+            var currentDir = stack.Pop();
             try
             {
-                files.AddRange(GetFiles(directory, pattern));
+                files.AddRange(Directory.GetFiles(currentDir, pattern));
+                foreach (var dir in Directory.GetDirectories(currentDir))
+                {
+                    stack.Push(dir);
+                }
             }
-            catch (UnauthorizedAccessException) { }
+            catch (UnauthorizedAccessException ex)
+            {
+                Console.WriteLine($"Access denied to folder {currentDir}: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error accessing folder {currentDir}: {ex.Message}");
+            }
+        }
 
         return files;
     }
@@ -144,13 +153,16 @@ public class FileManager
         int count = 0;
         try
         {
-            count = GetFiles(directory, "*.*").Count;
+            var files = GetFiles(directory, "*.*");
+            count = files.Count;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Console.WriteLine($"Access denied to folder {directory}: {ex.Message}");
         }
         catch (Exception ex)
         {
-
             Console.WriteLine($"Error counting files in {directory}: {ex.Message}");
-
         }
         return count;
     }
